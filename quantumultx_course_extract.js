@@ -36,6 +36,28 @@ function markTrySee(list) {
   }
 }
 
+function collectDirectories(data) {
+  const collected = [];
+
+  if (Array.isArray(data.trySeeDirList)) {
+    collected.push(...data.trySeeDirList);
+  }
+
+  if (Array.isArray(data.courseDirectoryNotInChapterList)) {
+    collected.push(...data.courseDirectoryNotInChapterList);
+  }
+
+  if (Array.isArray(data.chapterList)) {
+    for (const chapter of data.chapterList) {
+      if (chapter && Array.isArray(chapter.courseDirectoryList)) {
+        collected.push(...chapter.courseDirectoryList);
+      }
+    }
+  }
+
+  return collected;
+}
+
 const body = safeParse($response.body);
 
 if (!body || !body.data) {
@@ -45,13 +67,15 @@ if (!body || !body.data) {
 
   markTrySee(data.trySeeDirList);
   markTrySee(data.courseDirectoryNotInChapterList);
+  if (Array.isArray(data.chapterList)) {
+    for (const chapter of data.chapterList) {
+      if (chapter) {
+        markTrySee(chapter.courseDirectoryList);
+      }
+    }
+  }
 
-  const sourceList =
-    Array.isArray(data.courseDirectoryNotInChapterList) && data.courseDirectoryNotInChapterList.length
-      ? data.courseDirectoryNotInChapterList
-      : Array.isArray(data.trySeeDirList)
-        ? data.trySeeDirList
-        : [];
+  const sourceList = collectDirectories(data);
 
   const extracted = dedupeByUrl(
     sourceList.map((item) => ({
@@ -63,9 +87,10 @@ if (!body || !body.data) {
   const lines = extracted.map((item, index) => `${index + 1}. ${item.directoryName}\n${item.courseDirectoryUrl}`);
   const title = data.title || "课程目录";
   const subtitle = `${title} | 共 ${extracted.length} 条`;
-  const message = lines.length ? lines.join("\n\n") : "未提取到课程链接";
+  const preview = lines.length ? lines.slice(0, 5).join("\n\n") : "未提取到课程链接";
+  const message = lines.length > 5 ? `${preview}\n\n其余 ${lines.length - 5} 条请看日志` : preview;
 
-  console.log(message);
+  console.log(lines.length ? lines.join("\n\n") : "未提取到课程链接");
   $notify("Quantumult X", subtitle, message);
   $done({ body: JSON.stringify(body) });
 }
