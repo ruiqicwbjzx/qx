@@ -4,7 +4,7 @@ Quantumult X scripts.
 
 ## Files
 
-- `quantumultx_course_extract.js`: intercepts `https://goodminiapp.wendao101.com/course_detail/detail` and extracts `directoryName` and `courseDirectoryUrl` from the response body.
+- `quantumultx_course_extract.js`: intercepts `https://goodminiapp.wendao101.com/course_detail/detail`, extracts `directoryName` and `courseDirectoryUrl`, then sends them as a notification without modifying the original response body.
 
 ## Quantumult X
 

@@ -2,7 +2,7 @@
 Quantumult X
 
 [rewrite_local]
-^https:\/\/goodminiapp\.wendao101\.com\/course_detail\/detail url script-response-body https://your-local-path/quantumultx_course_extract.js
+^https:\/\/goodminiapp\.wendao101\.com\/course_detail\/detail url script-response-body https://raw.githubusercontent.com/ruiqicwbjzx/qx/main/quantumultx_course_extract.js
 
 [mitm]
 hostname = goodminiapp.wendao101.com
@@ -30,7 +30,7 @@ function dedupeByUrl(list) {
 const body = safeParse($response.body);
 
 if (!body || !body.data) {
-  $done({ body: $response.body });
+  $done({});
 } else {
   const data = body.data;
   const sourceList =
@@ -47,14 +47,12 @@ if (!body || !body.data) {
     }))
   );
 
-  const result = {
-    code: body.code,
-    msg: body.msg,
-    courseId: data.id || data.courseId || null,
-    title: data.title || "",
-    total: extracted.length,
-    list: extracted
-  };
+  const lines = extracted.map((item, index) => `${index + 1}. ${item.directoryName}\n${item.courseDirectoryUrl}`);
+  const title = data.title || "课程目录";
+  const subtitle = `${title} | 共 ${extracted.length} 条`;
+  const message = lines.length ? lines.join("\n\n") : "未提取到课程链接";
 
-  $done({ body: JSON.stringify(result) });
+  console.log(message);
+  $notify("Quantumult X", subtitle, message);
+  $done({});
 }
