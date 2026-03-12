@@ -27,12 +27,25 @@ function dedupeByUrl(list) {
   return Array.from(map.values());
 }
 
+function markTrySee(list) {
+  if (!Array.isArray(list)) return;
+  for (const item of list) {
+    if (item && Object.prototype.hasOwnProperty.call(item, "isTrySee")) {
+      item.isTrySee = 1;
+    }
+  }
+}
+
 const body = safeParse($response.body);
 
 if (!body || !body.data) {
-  $done({});
+  $done({ body: $response.body });
 } else {
   const data = body.data;
+
+  markTrySee(data.trySeeDirList);
+  markTrySee(data.courseDirectoryNotInChapterList);
+
   const sourceList =
     Array.isArray(data.courseDirectoryNotInChapterList) && data.courseDirectoryNotInChapterList.length
       ? data.courseDirectoryNotInChapterList
@@ -54,5 +67,5 @@ if (!body || !body.data) {
 
   console.log(message);
   $notify("Quantumult X", subtitle, message);
-  $done({});
+  $done({ body: JSON.stringify(body) });
 }
