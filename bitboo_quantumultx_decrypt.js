@@ -558,6 +558,27 @@ const BitBooQX = (() => {
     return lines.slice(0, maxLines).join("\n");
   }
 
+  function notifyChunks(title, subtitle, text, maxLength) {
+    const content = String(text || "");
+    if (!content) {
+      notify(title, subtitle, "(empty)");
+      return;
+    }
+    const limit = maxLength || 900;
+    if (content.length <= limit) {
+      notify(title, subtitle, content);
+      return;
+    }
+    let index = 0;
+    let part = 1;
+    while (index < content.length) {
+      const chunk = content.slice(index, index + limit);
+      notify(title, `${subtitle} | ${part}`, chunk);
+      index += limit;
+      part += 1;
+    }
+  }
+
   function inferMode(config) {
     if (config.mode) return config.mode;
     if (typeof $response !== "undefined") return "response";
@@ -604,7 +625,7 @@ const BitBooQX = (() => {
 
     const count = content ? content.split("\n").filter(Boolean).length : 0;
     log(`Quantumult X nodes:\n${content || "(empty)"}`);
-    notify("BitBoo", `节点 ${count} 条`, previewText(content || decrypted, 4));
+    notifyChunks("BitBoo", `节点 ${count} 条`, content || decrypted, 900);
     done({ content });
   }
 
@@ -619,7 +640,11 @@ const BitBooQX = (() => {
   function runResponseMode(config) {
     const encryptedBody = typeof $response !== "undefined" && $response ? $response.body : "";
     const decrypted = decryptBase64Payload(encryptedBody || "");
-    const output = enrichResponseText(decrypted, config.secret);
+    const parsed = safeJsonParse(decrypted);
+    const output =
+      parsed && parsed.data && Array.isArray(parsed.data.share_node)
+        ? buildNodeContent(parsed, config.secret)
+        : enrichResponseText(decrypted, config.secret);
     setValue(config.jsonKey, output);
     log(output);
     done({ body: output });
