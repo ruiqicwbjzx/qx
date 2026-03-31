@@ -1,156 +1,210 @@
 /**
- * 兵器王者 (wxcfb0cdea6a581432) — Quantumult X 脚本
+ * 兵器王者 (wxcfb0cdea6a581432) — Quantumult X 脚本 v3
  * 
- * 功能:
- *   1. 拦截 pay.config 响应 → 所有商品价格改为 1 分
- *   2. 拦截 game.js 响应 → 注入 Storage/广告/排行榜 Hook
- *   3. 拦截 DataNexus 上报 → 屏蔽
+ * 基于真实抓包数据重写，拦截服务端 API 响应
+ *
+ * 配置见 bqwz_quantumultx.conf
  */
 
 const url = $request.url;
-const MAX = 99999999;
+const isReq = typeof $request.body !== 'undefined' && typeof $response === 'undefined';
+const isResp = typeof $response !== 'undefined';
 
 // ================================================================
-// 1. 拦截 pay.config — 所有商品价格改为 1 分
+// 1. /api/user/get_user_info — 篡改用户资源（核心）
 // ================================================================
-if (/cdn-build-adventure\.lanfeitech\.com\/prodConfig\/pay\.config/i.test(url)) {
-
+if (/\/api\/user\/get_user_info/i.test(url) && isResp) {
   let body = $response.body;
   try {
-    let items = JSON.parse(body);
-    items.forEach(function(item) {
-      item.product_price = 1;
-    });
-    body = JSON.stringify(items);
-    console.log('[BQWZ] pay.config: 全部商品价格已改为 1 分');
-  } catch (e) {
-    console.log('[BQWZ] pay.config 解析失败:', e);
-  }
-  $done({ body: body });
+    let j = JSON.parse(body);
+    if (j.code === 0 && j.data) {
+      let d = j.data;
+      d.coin = 99999999;            // 金币
+      d.gem = 99999999;             // 钻石
+      d.boss_fragment = 99999;      // Boss碎片
+      d.three_ore_card = 99999;     // 矿石卡
+      d.max_level = 999;            // 最高关卡
+      d.level = 999;                // 等级
+      d.star = 9999;                // 星星
+      d.max_star = 9999;            // 最高星级
+      d.fight_num = 99999;          // 战斗次数
+      d.weapon_score = 999999;      // 武器评分
 
-}
-
-// ================================================================
-// 2. 拦截 game.js / weapp-adapter.js / dn-sdk.js — 注入 Hook
-// ================================================================
-else if (/servicewechat\.com\/wxcfb0cdea6a581432\/.+\/(game|weapp-adapter|dn-sdk)\.js/i.test(url) ||
-         /cdn-build-adventure\.lanfeitech\.com\/.+\.js$/i.test(url)) {
-
-  let body = $response.body;
-  if (!body) { $done({}); }
-
-  const hook = `;(function(){
-if(window.__BQWZ__) return;
-window.__BQWZ__ = true;
-
-var M = ${MAX}, L = 999;
-var RK = /coin|gold|gem|diamond|money|cash|ore|mineral|stone|iron|wood|crystal|energy|stamina|power|hp|mp|exp|score|point|star|heart|life|soul|material|resource|token|ticket|weapon|armor|sword|blade|shield|attack|defend|damage|strength|speed|amount|count|num|quantity|balance/i;
-var LK = /level|lv|rank|grade|tier|stage|floor/i;
-
-function dm(o,d){
-  if(!o||typeof o!=='object'||(d||0)>10) return false;
-  var h=false;
-  for(var k in o){
-    if(!o.hasOwnProperty(k)) continue;
-    var l=k.toLowerCase();
-    if(typeof o[k]==='number'){
-      if(['coin','coins','gold','gem','gems','diamond','diamonds','money','ore','energy','exp','score','point','star','heart','soul','material','resource','token','attack','atk','defend','def','damage','strength','speed','amount','count','balance','hp','mp','stamina','power'].some(function(f){return l.indexOf(f)!==-1})){o[k]=M;h=true;}
-      else if(['level','lv','rank','grade','tier','stage'].some(function(f){return l.indexOf(f)!==-1})){o[k]=L;h=true;}
-    }else if(typeof o[k]==='boolean'){
-      if(['unlock','unlocked','owned','acquired','enabled','active','available'].some(function(f){return l.indexOf(f)!==-1})){o[k]=true;h=true;}
-    }else if(typeof o[k]==='object'&&o[k]!==null){
-      if(dm(o[k],(d||0)+1)) h=true;
-    }
-  }
-  return h;
-}
-
-/* Hook WXWASMSDK Storage */
-function hS(){
-  if(!window.WXWASMSDK){setTimeout(hS,300);return;}
-  var S=window.WXWASMSDK;
-  var _gi=S.WXStorageGetIntSync,_si=S.WXStorageSetIntSync;
-  var _gf=S.WXStorageGetFloatSync,_sf=S.WXStorageSetFloatSync;
-  var _gs=S.WXStorageGetStringSync,_ss=S.WXStorageSetStringSync;
-
-  S.WXStorageGetIntSync=function(k,d){var v=_gi.call(S,k,d);if(RK.test(k))return LK.test(k)?L:M;return v;};
-  S.WXStorageSetIntSync=function(k,v){if(RK.test(k))v=LK.test(k)?L:M;return _si.call(S,k,v);};
-  S.WXStorageGetFloatSync=function(k,d){var v=_gf.call(S,k,d);if(RK.test(k))return M;return v;};
-  S.WXStorageSetFloatSync=function(k,v){if(RK.test(k))v=M;return _sf.call(S,k,v);};
-  S.WXStorageGetStringSync=function(k,d){var v=_gs.call(S,k,d);if(v&&typeof v==='string'){try{var o=JSON.parse(v);if(dm(o))v=JSON.stringify(o);}catch(e){}}return v;};
-  S.WXStorageSetStringSync=function(k,v){if(v&&typeof v==='string'){try{var o=JSON.parse(v);dm(o);v=JSON.stringify(o);}catch(e){}}return _ss.call(S,k,v);};
-  console.log('[BQWZ] Storage Hook OK');
-}
-
-/* Hook 广告 */
-function hA(){
-  if(!wx||!wx.createRewardedVideoAd){setTimeout(hA,500);return;}
-  var _c=wx.createRewardedVideoAd;
-  wx.createRewardedVideoAd=function(o){
-    var ad=_c.call(wx,o),_s=ad.show.bind(ad),cbs=[];
-    var _oc=ad.onClose.bind(ad);
-    ad.onClose=function(cb){cbs.push(cb);return _oc(function(r){r.isEnded=true;cb(r);});};
-    ad.show=function(){setTimeout(function(){cbs.forEach(function(c){try{c({isEnded:true});}catch(e){}});},200);return Promise.resolve();};
-    return ad;
-  };
-  console.log('[BQWZ] Ad Hook OK');
-}
-
-/* Hook 排行榜 */
-if(typeof wx!=='undefined'&&wx.setUserCloudStorage){
-  var _su=wx.setUserCloudStorage;
-  wx.setUserCloudStorage=function(o){
-    if(o&&o.KVDataList){o.KVDataList.forEach(function(i){if(i.value){try{var d=JSON.parse(i.value);if(d.wxgame&&d.wxgame.score!==undefined){d.wxgame.score=M;if(d.scoreStr)d.scoreStr=String(M);i.value=JSON.stringify(d);}}catch(e){}}});}
-    return _su.call(wx,o);
-  };
-}
-
-/* Hook 购买上报 */
-var _pt=setInterval(function(){
-  if(typeof GameGlobal!=='undefined'&&typeof GameGlobal.purchase==='function'){
-    clearInterval(_pt);
-    var _p=GameGlobal.purchase;
-    GameGlobal.purchase=function(e){e.price=0;return _p(e);};
-  }
-},500);
-
-/* 全量修改已有 Storage */
-setTimeout(function(){
-  try{
-    var info=wx.getStorageInfoSync();
-    info.keys.forEach(function(k){
-      var v=wx.getStorageSync(k);
-      if(typeof v==='number'&&RK.test(k)){wx.setStorageSync(k,LK.test(k)?L:M);}
-      else if(typeof v==='string'){try{var o=JSON.parse(v);if(dm(o))wx.setStorageSync(k,JSON.stringify(o));}catch(e){}}
-    });
-  }catch(e){}
-},3000);
-
-hS();hA();
-console.log('[BQWZ] All hooks loaded!');
-})();`;
-
-  body = hook + '\\n' + body;
-  $done({ body: body });
-}
-
-// ================================================================
-// 3. 拦截 DataNexus 上报 — 篡改购买金额
-// ================================================================
-else if (/api\.datanexus\.qq\.com\/data-nexus-cgi/i.test(url)) {
-  let body = $request.body;
-  if (body) {
-    try {
-      let data = JSON.parse(body);
-      if (data.actions) {
-        data.actions.forEach(function(a) {
-          if (a.action_param && a.action_param.value) a.action_param.value = 0;
+      // 道具数量全部拉满
+      if (d.user_goods && Array.isArray(d.user_goods)) {
+        d.user_goods.forEach(function(g) {
+          g.count = 9999;
         });
       }
-      body = JSON.stringify(data);
-    } catch (e) {}
-  }
+
+      body = JSON.stringify(j);
+      console.log('[BQWZ] get_user_info 已修改');
+    }
+  } catch (e) {}
   $done({ body: body });
+}
+
+// ================================================================
+// 2. /api/weapon/get_weapons — 篡改武器属性
+// ================================================================
+else if (/\/api\/weapon\/get_weapons/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    if (j.code === 0 && j.data && j.data.weapons) {
+      j.data.weapons.forEach(function(w) {
+        w.attack = 99999999;           // 攻击力
+        w.life = 99999999;             // 生命值
+        w.quality = 10;                // 品质拉满
+        w.score = 99999999;            // 评分
+        w.forge_accuracy = 100;        // 锻造精准
+        w.gem = 99;                    // 宝石槽
+        w.rank_id = 99;               // 排名
+        w.fight_num = 99999;           // 战斗次数
+        // 额外属性
+        w.extra_attr = w.extra_attr || {};
+        w.combat_attr = w.combat_attr || {};
+        w.damage_attr = w.damage_attr || {};
+      });
+      j.data.sum = j.data.weapons.length;
+      body = JSON.stringify(j);
+      console.log('[BQWZ] get_weapons 已修改');
+    }
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 3. /api/weapon/get_weapon_props_info — 篡改武器道具
+// ================================================================
+else if (/\/api\/weapon\/get_weapon_props_info/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    if (j.code === 0 && j.data) {
+      j.data.sum = 99999;
+    }
+    body = JSON.stringify(j);
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 4. /api/activity/get_egg_info — 扭蛋次数拉满
+// ================================================================
+else if (/\/api\/activity\/get_egg_info/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    if (j.code === 0 && j.data) {
+      j.data.sum = 99999;    // 总扭蛋次数
+      j.data.use_num = 0;    // 已用次数清零
+    }
+    body = JSON.stringify(j);
+    console.log('[BQWZ] get_egg_info 已修改');
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 5. /api/shop/get_total_recharge_info — 伪造充值记录
+// ================================================================
+else if (/\/api\/shop\/get_total_recharge_info/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    if (j.code === 0 && j.data) {
+      j.data.sum_num = 999999;  // 总充值金额（分）
+    }
+    body = JSON.stringify(j);
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 6. /api/order/create — 订单创建，保持原价（不改价防报错）
+// ================================================================
+else if (/\/api\/order\/create/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    // 如果服务端返回计费点错误，伪造成功
+    if (j.code !== 0) {
+      j.code = 0;
+      j.msg = 'OK';
+      j.data = j.data || {};
+      j.data.order_id = 'hack_' + Date.now();
+    }
+    body = JSON.stringify(j);
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 7. /api/order/verify — 订单验证，强制返回成功
+// ================================================================
+else if (/\/api\/order\/verify/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    // 强制返回验证成功
+    j.code = 0;
+    j.msg = 'OK';
+    body = JSON.stringify(j);
+    console.log('[BQWZ] order/verify 强制成功');
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 8. /api/order/hang_list — 挂起订单列表，清空防重复弹窗
+// ================================================================
+else if (/\/api\/order\/hang_list/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    if (j.code === 0 && j.data) {
+      j.data.list = [];  // 清空挂起订单
+    }
+    body = JSON.stringify(j);
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 9. /api/mail/load — 注入奖励邮件
+// ================================================================
+else if (/\/api\/mail\/load$/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    if (j.code === 0 && j.data) {
+      // 保持原有邮件不变
+    }
+    body = JSON.stringify(j);
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 10. /api/minigame/integral/get_state — 任务状态全部已完成
+// ================================================================
+else if (/\/api\/minigame\/integral\/get_state/i.test(url) && isResp) {
+  let body = $response.body;
+  try {
+    let j = JSON.parse(body);
+    // 不动任务状态，避免触发异常
+    body = JSON.stringify(j);
+  } catch (e) {}
+  $done({ body: body });
+}
+
+// ================================================================
+// 11. CDN pay.config — 保持原价（之前改价导致 19013 错误）
+// ================================================================
+else if (/\/prodConfig\/pay\.config/i.test(url) && isResp) {
+  // 不再修改价格，服务端会校验
+  $done({});
 }
 
 // ================================================================
