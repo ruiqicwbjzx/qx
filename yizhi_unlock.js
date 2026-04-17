@@ -20,9 +20,21 @@ let body = $response.body;
 
 function notify(subtitle, message) {
     if (typeof $notification !== 'undefined') {
-        $notification.post(NAME, subtitle, message);
+        $notification.post(NAME, subtitle, String(message).substring(0, 250));
     }
 }
+
+// 提取接口名用于日志
+function apiName(u) {
+    let m = u.match(/\/curriculum\/([^?]+)/);
+    return m ? m[1] : u.substring(0, 80);
+}
+
+// 检查body是否有效
+if (!body || body === 'undefined' || body === 'null' || body.trim() === '') {
+    notify('⚠️ ' + apiName(url), '响应体为空: [' + String(body) + '] url=' + url.substring(0, 100));
+    $done({ body });
+} else {
 
 try {
     let obj = JSON.parse(body);
@@ -112,7 +124,8 @@ try {
         body = JSON.stringify(obj);
     }
 } catch (e) {
-    notify('⚠️ 脚本异常', e.message);
+    notify('⚠️ ' + apiName(url), '解析失败: ' + e.message + ' | body前100字符: ' + String(body).substring(0, 100));
 }
 
 $done({ body });
+} // end else
