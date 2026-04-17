@@ -9,6 +9,8 @@ Quantumult X scripts.
 - `wendao_course.conf`: Quantumult X subscription file that imports the rewrite rule and MITM hostname.
 - `bitboo_quantumultx_decrypt.js`: Quantumult X script for BitBoo AES-CBC payload decryption and node conversion.
 - `bitboo.conf`: Quantumult X subscription file for the BitBoo decrypt script.
+- `yizhi_unlock.js`: 易知课堂(yizhiknow.com)付费视频解锁脚本，拦截付费状态/课程详情/课时列表接口响应并修改为已购买状态。
+- `yizhi_unlock.conf`: 易知课堂 QX 订阅配置文件。
 
 ## Subscription
 
@@ -19,6 +21,10 @@ Use this URL in Quantumult X resource subscription:
 BitBoo subscription:
 
 `https://raw.githubusercontent.com/ruiqicwbjzx/qx/main/bitboo.conf`
+
+易知课堂 subscription:
+
+`https://raw.githubusercontent.com/ruiqicwbjzx/qx/main/yizhi_unlock.conf`
 
 ## Quantumult X
 
